@@ -10,6 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.getElementById('startGameButton').addEventListener('click', () => {
     // This command opens a new tab and loads your React app on localhost
-    chrome.tabs.create({ url: 'http://localhost:3000' });
+    chrome.tabs.create({ url: 'http://localhost:5173' });
   });
 });

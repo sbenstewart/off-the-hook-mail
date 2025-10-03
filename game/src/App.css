@@ -1,34 +1,42 @@
-.App {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background-color: #f0f2f5;
-}
-.game-container {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
   text-align: center;
 }
-.email-box {
-  border: 1px solid #ddd;
-  padding: 15px;
-  margin-bottom: 20px;
-  text-align: left;
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
 }
-.email-header {
-  border-bottom: 1px solid #eee;
-  padding-bottom: 10px;
-  margin-bottom: 10px;
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
 }
-button {
-  margin: 0 10px;
-  padding: 10px 20px;
-  cursor: pointer;
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
 }
-.feedback {
-  margin-top: 20px;
-  font-weight: bold;
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
 }

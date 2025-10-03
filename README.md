@@ -26,7 +26,7 @@ The project is organized into three top-level folders:
 |-- /python-server
 |   |-- server.py           (Flask Backend)
 |
-|-- /game                   <-- REACT GAME DIRECTORY
+|-- /game                   <-- VITE GAME DIRECTORY
 |   |-- package.json
 |   |-- /src
 |   |-- ...
@@ -36,9 +36,10 @@ The project is organized into three top-level folders:
 ### Prerequisites
 * Node.js and npm: For running the React game.
 * Python 3: For running the Flask server.
-
 * Flask: Install the required Python library(CORS is essential for communication with the extension).: 
-pip install Flask flask-cors 
+```
+pip install Flask flask-cors
+``` 
 
 ### Step 1: Start the React Game
 The game is crucial for the extension's "Play Game" button to function correctly.
@@ -47,9 +48,9 @@ The game is crucial for the extension's "Play Game" button to function correctly
 ```
 cd game
 npm install
-npm start
+npm run dev
 ```
-The game should now be running at http://localhost:3000. Keep this terminal running.
+The game should now be running at http://localhost:5173. Keep this terminal running.
 
 ### Step 2: Start the Python Flask Server
 The server handles all the analysis requests from the extension.
