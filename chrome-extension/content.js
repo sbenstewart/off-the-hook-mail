@@ -2,16 +2,26 @@
 let lastEmailContent = null;
 let debounceTimeout = null;
 
-// Function to send email data to the server and handle the response
+// Utility function to introduce a deliberate delay
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function analyzeAndDisplay(emailData) {
   try {
-    const response = await fetch('http://127.0.0.1:5000/analyze-email', {
+    // 1. Show the "Analyzing..." message instantly when analysis starts
+    updateBanner({ is_phish: false, message: "Analyzing email for phishing indicators...", initial: true });
+
+    // 2. Start the API request and the timer simultaneously
+    const apiPromise = fetch('http://127.0.0.1:5000/analyze-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(emailData),
-    });
+    }).then(response => response.json());
 
-    const result = await response.json();
+    const minWaitPromise = wait(2000); // Wait for a minimum of 2 seconds
+
+    // 3. Wait for BOTH the API result AND the minimum wait time to complete
+    const [result] = await Promise.all([apiPromise, minWaitPromise]);
+    
     console.log("Server Response:", result);
     
     // Send a message to the background script to update stats
@@ -20,30 +30,99 @@ async function analyzeAndDisplay(emailData) {
       is_phish: result.is_phish
     });
 
-    // Update the banner based on the server's response
+    // 4. Update the banner with the final analysis result
     updateBanner(result);
 
   } catch (error) {
     console.error("Error communicating with server:", error);
-    updateBanner({ is_phish: false, message: "Could not connect to server." });
+    updateBanner({ is_phish: false, message: "Model connection failed. Check API token and server logs." });
   }
 }
 
-// Function to update the banner with the analysis result
 function updateBanner(result) {
-  const existingBanner = document.querySelector('.simple-banner');
-  if (existingBanner) {
-    if (result.is_phish) {
-      existingBanner.style.backgroundColor = '#fce8e8';
-      existingBanner.style.border = '1px solid #c71c1c';
-      existingBanner.style.color = '#c71c1c';
-      existingBanner.textContent = `🚨 WARNING: ${result.message}`;
+  const banner = document.querySelector('.simple-banner');
+  if (banner) {
+    let bgColor, borderColor, textColor, message;
+
+    // --- Google/Material Design Color Palette ---
+    if (result.initial) {
+        bgColor = '#fffde7'; 
+        borderColor = '#fdd835'; 
+        textColor = '#5f6368'; 
+        message = `⏳ ${result.message}`;
+    } else if (result.is_phish) {
+      // Phishing Detected (Warning State - Red)
+      bgColor = '#fef7f7'; 
+      borderColor = '#f28b82'; 
+      textColor = '#d93025'; 
+      message = `🚨 HIGH RISK: ${result.message}`;
     } else {
-      existingBanner.style.backgroundColor = '#e3f2fd';
-      existingBanner.style.border = '1px solid #2196f3';
-      existingBanner.style.color = '#1976d2';
-      existingBanner.textContent = `✅ Result: ${result.message}`;
+      // Legitimate (Safe State - Blue)
+      bgColor = '#e8f0fe'; 
+      borderColor = '#8ab4f8'; 
+      textColor = '#1a73e8'; 
+      message = `✅ SAFE: ${result.message}`;
     }
+
+    // Apply color and text updates
+    banner.style.backgroundColor = bgColor;
+    banner.style.borderColor = borderColor;
+    banner.style.color = textColor;
+    
+    // Update the message content in the dedicated text span
+    const messageSpan = banner.querySelector('.banner-message');
+    if (messageSpan) {
+        messageSpan.textContent = message;
+    }
+    
+    // Update the color of the branding text
+    const brandingText = banner.querySelector('.branding-text');
+    if (brandingText) {
+        brandingText.style.color = textColor;
+    }
+  }
+}
+
+function injectBanner() {
+  const emailView = document.querySelector('div[role="main"]');
+  if (emailView && emailView.querySelector('.a3s.aiL') && !emailView.querySelector('.simple-banner')) {
+    const banner = document.createElement('div');
+    
+    // Apply Material Design structural styling
+    banner.classList.add('simple-banner');
+    banner.style.cssText = `
+      padding: 12px 16px; 
+      margin-bottom: 12px;
+      margin-left: 10px;
+      border-radius: 8px;
+      border: 1px solid;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+      
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+      line-height: 1.4;
+      font-family: Roboto, Arial, sans-serif;
+    `;
+    
+    // Inner HTML structure for the single-line message and footer
+    banner.innerHTML = `
+        <div class="banner-footer" style="display: flex; align-items: center; justify-content: space-between;">
+            <!-- Left Side: Dynamic Message -->
+            <span class="banner-message" style="font-weight: 500;">Analyzing email for phishing indicators...</span>
+            
+            <!-- Right Side: Powered By -->
+            <div style="display: flex; align-items: center; white-space: nowrap; margin-left: 12px;">
+                <span class="branding-text" style="font-weight: 400; font-size: 11px; margin-right: 6px; opacity: 0.8; color: currentColor;">Powered by Off-the-Hook</span>
+                <img src="${chrome.runtime.getURL('images/icon-16.png')}" alt="Off-the-Hook Logo" style="width: 16px; height: 16px; display: block; opacity: 0.8;">
+            </div>
+        </div>
+    `;
+
+    emailView.prepend(banner);
+    
+    // Set initial analyzing state right after injection
+    updateBanner({ initial: true, message: "Analyzing email for phishing indicators..." });
   }
 }
 
@@ -67,34 +146,12 @@ function processEmail() {
         
         lastEmailContent = currentEmailContent;
         
-        // Inject the initial banner
         injectBanner();
         
-        // Send the data to the server for analysis
         analyzeAndDisplay(currentEmailContent);
       }
     }
   }, 300);
-}
-
-function injectBanner() {
-  const emailView = document.querySelector('div[role="main"]');
-  if (emailView && emailView.querySelector('.a3s.aiL') && !emailView.querySelector('.simple-banner')) {
-    const banner = document.createElement('div');
-    banner.style.cssText = `
-      background-color: #e3f2fd;
-      border: 1px solid #2196f3;
-      color: #1976d2;
-      padding: 10px;
-      margin-bottom: 10px;
-      font-weight: bold;
-      border-radius: 5px;
-      text-align: center;
-    `;
-    banner.textContent = "Analyzing email for phishing indicators...";
-    banner.classList.add('simple-banner');
-    emailView.prepend(banner);
-  }
 }
 
 const observer = new MutationObserver((mutations) => {

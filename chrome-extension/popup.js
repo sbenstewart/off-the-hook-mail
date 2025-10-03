@@ -12,4 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // This command opens a new tab and loads your React app on localhost
     chrome.tabs.create({ url: 'http://localhost:5173' });
   });
+
+  document.getElementById('startQuizButton').addEventListener('click', () => {
+    // Navigates to the Quiz route
+    chrome.tabs.create({ url: 'http://localhost:3000' });
+  });
+
 });

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Phishing Detector",
+  "name": "off-the-hook",
   "version": "1.0",
-  "description": "A simple extension to detect potential phishing emails in Gmail.",
+  "description": "Protects you from phishing emails and promotes security awareness.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["https://mail.google.com/*"],
   "content_scripts": [
@@ -16,5 +16,16 @@
   },
   "background": {
     "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["images/icon-16.png"],
+      "matches": ["https://mail.google.com/*"]
+    }
+  ],
+  "icons": {
+    "16": "images/icon-16.png",
+    "32": "images/icon-32.png",
+    "128": "images/icon-128.png"
   }
 }
