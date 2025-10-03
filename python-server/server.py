@@ -33,25 +33,31 @@ class HybridPhishingDetector(nn.Module):
     - Combined through dense layers for final prediction
     """
 
-    def __init__(self, model_name='distilbert-base-uncased', n_features=10, dropout=0.5):
+    def __init__(self, model_name='distilbert-base-uncased', n_features=19, dropout=0.5):
         super(HybridPhishingDetector, self).__init__()
 
         # Transformer backbone
         self.transformer = AutoModel.from_pretrained(model_name)
         transformer_dim = self.transformer.config.hidden_size
 
-        # Feature processing with stronger regularization
-        # NOTE: Keys like 'feature_bn' and 'feature_fc' are derived from this structure.
+        # Feature processing with stronger regularization (updated architecture from mail.ipynb)
         self.feature_bn = nn.BatchNorm1d(n_features)
         self.feature_fc = nn.Sequential(
-            nn.Linear(n_features, 64),
+            nn.Linear(n_features, 128),
             nn.ReLU(),
-            nn.Dropout(0.4)
+            nn.Dropout(0.3),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 64),
+            nn.ReLU()
         )
 
-        # Combined classifier with increased dropout
+        # Combined classifier with increased dropout (updated architecture from mail.ipynb)
         self.classifier = nn.Sequential(
-            nn.Linear(transformer_dim + 64, 256),
+            nn.Linear(transformer_dim + 64, 512),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.BatchNorm1d(512),
+            nn.Linear(512, 256),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.BatchNorm1d(256),
@@ -80,78 +86,111 @@ class HybridPhishingDetector(nn.Module):
 
         return logits
 
-# Feature Extractor Class (Copied from Training Script)
-class FeatureExtractor:
-    """Extract hand-crafted features that catch phishing patterns"""
+# Enhanced Feature Extractor Class (Copied from mail.ipynb)
+class EnhancedFeatureExtractor:
+    """Extract enhanced hand-crafted features that catch phishing patterns (19 features)"""
     def __init__(self):
-        # Ensure these lists match the training script exactly
         self.urgency_words = ['urgent', 'immediately', 'asap', 'expire', 'expiring',
-                              'expires', 'deadline', 'hurry', 'rush', 'quick', 'now']
-        self.threat_words = ['suspend', 'blocked', 'deactivate',
-                            'deactivated', 'locked', 'freeze', 'frozen', 'terminate']
+                              'expires', 'deadline', 'hurry', 'rush', 'quick', 'now', 'act now']
+        self.threat_words = ['suspend', 'suspended', 'block', 'blocked', 'deactivate',
+                            'deactivated', 'locked', 'freeze', 'frozen', 'terminate', 'close', 'disabled']
         self.action_words = ['click', 'verify', 'confirm', 'update', 'validate',
-                            'authenticate', 'secure', 'restore', 'unlock']
-        self.typosquatting = ['micros0ft', 'g00gle', 'paypa1', 'amaz0n', 'app1e']
+                            'authenticate', 'secure', 'restore', 'unlock', 'download']
+        self.asu_legitimate_domains = ['asu.edu', 'my.asu.edu', 'students.asu.edu', 'canvas.asu.edu',
+                                       'asurite.asu.edu', 'parking.asu.edu', 'housing.asu.edu']
+        self.asu_fake_domains = ['asu.com', 'asu.net', 'asu.co', 'assu.edu', 'aasu.edu',
+                                'arizona-state.com', 'asu-admin.com', 'my-asu.com', 'asu-verify.tk']
+        self.suspicious_tlds = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz', '.top',
+                               '.click', '.pw', '.cc', '.loan', '.download', '.zip']
+        self.free_email_providers = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
+                                     'aol.com', 'mail.com', 'protonmail.com', 'icloud.com']
+        self.typosquatting_patterns = ['micros0ft', 'g00gle', 'paypa1', 'amaz0n', 'app1e',
+                                       'assu', 'aasu', 'azsu', 'azu']
+        self.sensitive_terms = ['ssn', 'social security', 'password', 'pin', 'credit card',
+                               'bank account', 'routing number', 'account number']
 
-    def extract(self, text):
-        """Extract all 10 features from email text in the order required by the model"""
+    def extract(self, text, sender=''):
+        """Extract all 19 features from email text in the order required by the model"""
+        if not isinstance(text, str):
+            text = ''
         text_lower = text.lower()
         features = {}
 
-        # The 10 features must be extracted and returned in the precise order 
-        # that the model expects them (order determined by the training script).
-        
-        # 1. Urgency count
+        # Features 1-3: Basic pattern counts
         features['urgency_count'] = sum(word in text_lower for word in self.urgency_words)
-
-        # 2. Threat count
         features['threat_count'] = sum(word in text_lower for word in self.threat_words)
-
-        # 3. Action count
         features['action_count'] = sum(word in text_lower for word in self.action_words)
 
-        # 4. URL count (using the training script's pattern)
+        # Features 4-7: URL analysis
         url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
         features['url_count'] = len(re.findall(url_pattern, text))
-
-        # 5. Has URL (binary)
         features['has_url'] = 1 if features['url_count'] > 0 else 0
 
-        # 6. Obfuscated URL (hxxp://, h**p://)
         obfuscated_pattern = r'h[x*]{2}p[s]?://'
         features['obfuscated_url'] = 1 if re.search(obfuscated_pattern, text_lower) else 0
+        features['typosquatting'] = 1 if any(typo in text_lower for typo in self.typosquatting_patterns) else 0
 
-        # 7. Typosquatting
-        features['typosquatting'] = 1 if any(typo in text_lower for typo in self.typosquatting) else 0
+        # Features 8-10: Text characteristics
+        features['length'] = min(len(text) / 1000.0, 10.0)
+        features['exclamation_marks'] = min(text.count('!'), 10)
 
-        # 8. Length (normalized to 1000)
-        features['length'] = len(text)
-
-        # 9. Exclamation marks (normalized to 10)
-        features['exclamation_marks'] = text.count('!')
-
-        # 10. Capital ratio
         capitals = sum(1 for c in text if c.isupper())
         features['capital_ratio'] = capitals / len(text) if len(text) > 0 else 0
 
-        # NOTE: The FeatureExtractor in the training script returns a DataFrame, 
-        # but here we need a numpy array of just the values in the correct order.
+        # Features 11-12: ASU-specific domain analysis
+        asu_mentioned = any(term in text_lower for term in ['asu', 'arizona state', 'sun devil'])
+        if sender and asu_mentioned:
+            sender_domain = sender.split('@')[-1].lower() if '@' in sender else sender.lower()
+            is_legit_asu = any(domain in sender_domain for domain in self.asu_legitimate_domains)
+            features['asu_domain_mismatch'] = 1 if not is_legit_asu else 0
+            is_free_provider = any(provider in sender_domain for provider in self.free_email_providers)
+            features['asu_from_free_email'] = 1 if (not is_legit_asu and is_free_provider) else 0
+        else:
+            features['asu_domain_mismatch'] = 0
+            features['asu_from_free_email'] = 0
+
+        # Features 13-16: Advanced pattern detection
+        features['known_fake_domain'] = 1 if any(fake in text_lower for fake in self.asu_fake_domains) else 0
+        features['suspicious_tld'] = 1 if any(tld in text_lower for tld in self.suspicious_tlds) else 0
+        features['sensitive_info_request'] = 1 if any(term in text_lower for term in self.sensitive_terms) else 0
+
+        ip_pattern = r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'
+        features['ip_address_url'] = 1 if re.search(ip_pattern, text) else 0
+
+        # Features 17-19: Combined indicators
+        features['urgency_threat_combo'] = 1 if (features['urgency_count'] >= 2 and features['threat_count'] >= 1) else 0
+
+        combo_score = (features['urgency_count'] * 0.3 + features['threat_count'] * 0.3 +
+                      features['action_count'] * 0.2 + features['url_count'] * 0.2)
+        features['phishing_combo_score'] = min(combo_score, 5.0)
+
+        if len(text) > 0:
+            total_indicators = (features['urgency_count'] + features['threat_count'] +
+                              features['action_count'] + features['url_count'])
+            features['indicator_density'] = (total_indicators / len(text)) * 100
+        else:
+            features['indicator_density'] = 0
+
+        # Return all 19 features in the expected order
         return np.array([
             features['urgency_count'], features['threat_count'], features['action_count'],
             features['url_count'], features['has_url'], features['obfuscated_url'],
             features['typosquatting'], features['length'], features['exclamation_marks'],
-            features['capital_ratio']
+            features['capital_ratio'], features['asu_domain_mismatch'], features['asu_from_free_email'],
+            features['known_fake_domain'], features['suspicious_tld'], features['sensitive_info_request'],
+            features['ip_address_url'], features['urgency_threat_combo'], features['phishing_combo_score'],
+            features['indicator_density']
         ], dtype=np.float32)
 
 # Load Model Weights
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'best_phishing_detector.pth')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'best_model.pth')
 if not os.path.exists(MODEL_PATH):
     raise FileNotFoundError(f"Model file not found at: {MODEL_PATH}")
 
 print(f"Loading model weights from: {MODEL_PATH}")
 
-# Note: n_features=10 and dropout=0.5 are standard values from the training script
-model = HybridPhishingDetector(n_features=10, dropout=0.5)
+# Note: n_features=19 and dropout=0.5 are standard values from the training script
+model = HybridPhishingDetector(n_features=19, dropout=0.5)
 
 # The fix: This should now load without the RuntimeError because the classes match.
 model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
@@ -160,7 +199,7 @@ model.to(device)
 model.eval()
 
 tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-feat_ext = FeatureExtractor()
+feat_ext = EnhancedFeatureExtractor()
 
 print("✓ Deep Learning Model loaded and ready!")
 
