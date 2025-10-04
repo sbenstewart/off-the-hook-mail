@@ -83,7 +83,7 @@ pip install Flask flask-cors torch transformers pandas numpy scikit-learn
 The server now features a sophisticated hybrid ML model for real phishing detection.
 
 * Open a terminal and navigate to the python-server/ directory.
-* Ensure the trained model file (`best_model.pth`) is present
+* Ensure the trained model file (`best_model.pth`) is present. To directly use the model, you can access it [here](https://drive.google.com/file/d/16f8wCBMSGe6uNLx_EQmDSm206z-80EPr/view?usp=sharing) or you can create it with the jupyter notebook present in the repo.
 * Start the Flask application:
 ```bash
 cd python-server
@@ -178,7 +178,7 @@ The `python-server/mail.ipynb` notebook contains the complete model development 
   - **Traditional ML Features**: Engineered features for pattern recognition
   - **Ensemble Approach**: Combines both approaches for superior accuracy
 * **Training Process**: Comprehensive training with validation and testing phases
-* **Model Export**: Trained model saved as `best_model.pth` for production use
+* **Model Export**: Trained model saved as `best_model.pth` for production use. To directly use the model, you can access it [here](https://drive.google.com/file/d/16f8wCBMSGe6uNLx_EQmDSm206z-80EPr/view?usp=sharing)
 
 ### Model Performance
 * **High Accuracy**: Achieves excellent performance on real-world phishing datasets
